@@ -1,0 +1,95 @@
+#!/bin/python
+
+import subprocess;
+import json;
+
+DATABASES_FILE = "/etc/sysconfig/couchdb_databases";
+NODES_FILE = "/etc/sysconfig/couchdb_nodes";
+COUCHDB_HTTP_PORT = 5984;
+
+def initializeReplication():
+    databasesToRepicate = getSectionInFile(DATABASES_FILE, "database");
+    otherIps = getIpsOtherNodesInCluster();
+    replicateDatabasesTo(databasesToRepicate, otherIps);
+    
+def replicateDatabasesTo(databaseNames, ipsToReplicateTo):
+    for targetIp in ipsToReplicateTo:
+        for database in databaseNames:
+            if not hasDatabase(getOwnIp(), database):
+                createDatabase(getOwnIp(), database);
+            if not isReplicationLinkSet(getOwnIp(), targetIp, database):
+                setReplicationLink(getOwnIp(), targetIp, database);
+                setReplicationLink(targetIp, getOwnIp(), database);
+
+def getReplicationCommand(sourceIp, targetIp, databaseName):
+    communicateToHttpAddress = createHttpAddress(sourceIp, COUCHDB_HTTP_PORT, "_replicate");
+    sourceHttpAddress = createHttpAddress(sourceIp, COUCHDB_HTTP_PORT, databaseName);
+    targetHttpAddress = createHttpAddress(targetIp, COUCHDB_HTTP_PORT, databaseName);
+    result = ["curl", "-H", "'Content-Type: application/json'"];
+    result += ["-X", "POST", communicateToHttpAddress]; 
+    minusDArgument = "'{\"source\": \"" + sourceHttpAddress + "\", \"target\": \"" + targetHttpAddress + "\",";
+    minusDArgument += "\"create_target\": true, \"continuous\": true}'";
+    result += ["-d", minusDArgument];
+    return result;
+
+# Path parameter without leading slash
+def createHttpAddress(ip, port, path):
+    return "http://" +  ip + ":" + str(port) + "/" + path;
+
+def hasDatabase(ip, databaseName):
+    httpAddress = createHttpAddress(ip, COUCHDB_HTTP_PORT, "_all_dbs");
+    command = ["curl", "-X", "GET", httpAddress];
+    output = executeShellCommand(command);
+    parsedOutput = json.loads(output);
+    return parsedOutput["ok"];
+    
+def setReplicationLink(sourceIp, targetIp, databaseName):
+    command = getReplicationCommand(sourceIp, targetIp, databaseName);
+    output = executeShellCommand(command);
+    parsedOutput = json.loads(output);
+    if not parsedOutput["ok"]:
+        raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + ")");
+    
+def isReplicationLinkSet(sourceIp, targetIp, databaseName):
+    # TODO: Query _replicate database
+    return;
+
+def createDatabase(ip, databaseName):
+    httpAddress = createHttpAddress(ip, COUCHDB_HTTP_PORT, databaseName);
+    command = ["curl", "-X", "PUT", httpAddress];
+    output = executeShellCommand(command);
+    parsedOutput = json.loads(output);
+    if not parsedOutput["ok"]:
+        raise Exception("Database could not be created");
+
+def executeShellCommand(command):
+    process = subprocess.Popen(command, stdout = subprocess.PIPE);
+    output = process.communicate()[0];
+    if process.poll() != 0:
+        raise Exception("Execution of command failed (" + " ".join(command) + ")");
+    return output;
+
+def getIpsOtherNodesInCluster():
+    ipsInCluster = getIpsInCluster();
+    ownIp = getOwnIp();
+    return ipsInCluster - ownIp;
+    
+def getOwnIp():
+    return getSectionInFile(NODES_FILE, "self");
+    
+def getIpsInCluster():
+    return getSectionInFile(NODES_FILE, "node");
+    
+def getSectionInFile(pathToFile, label):
+    filestream = open(pathToFile, "r");
+    result = set();
+    for line in filestream:
+        if line.find(label) != -1:
+            resultItem = line.strip(" \n");
+            resultItem = resultItem.split(' ')[1];
+            resultItem = resultItem.strip(" \n");
+            result.add(resultItem);
+    filestream.close();
+    return result;
+    
+initializeReplication();
