@@ -17,46 +17,46 @@ def replicateDatabasesTo(databaseNames, ipsToReplicateTo):
         for database in databaseNames:
             if not hasDatabase(getOwnIp(), database):
                 createDatabase(getOwnIp(), database);
-            if not isReplicationLinkSet(getOwnIp(), targetIp, database):
+            if not isReplicationLinkSet(getOwnIp(), targetIp, database) and isCouchdbServerReachable(targetIp):
                 setReplicationLink(getOwnIp(), targetIp, database);
                 setReplicationLink(targetIp, getOwnIp(), database);
 
 def getReplicationCommand(sourceIp, targetIp, databaseName):
-    communicateToHttpAddress = createHttpAddress(sourceIp, COUCHDB_HTTP_PORT, "_replicate");
-    sourceHttpAddress = createHttpAddress(sourceIp, COUCHDB_HTTP_PORT, databaseName);
-    targetHttpAddress = createHttpAddress(targetIp, COUCHDB_HTTP_PORT, databaseName);
+    communicateToUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, "_replicate");
+    sourceUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, databaseName);
+    targetUrl = createUrl(targetIp, COUCHDB_HTTP_PORT, databaseName);
     result = ["curl", "-H", "'Content-Type: application/json'"];
-    result += ["-X", "POST", communicateToHttpAddress]; 
-    minusDArgument = "'{\"source\": \"" + sourceHttpAddress + "\", \"target\": \"" + targetHttpAddress + "\",";
+    result += ["-X", "POST", communicateToUrl]; 
+    minusDArgument = "'{\"source\": \"" + sourceUrl + "\", \"target\": \"" + targetUrl + "\",";
     minusDArgument += "\"create_target\": true, \"continuous\": true}'";
     result += ["-d", minusDArgument];
     return result;
 
 # Path parameter without leading slash
-def createHttpAddress(ip, port, path):
+def createUrl(ip, port, path):
     return "http://" +  ip + ":" + str(port) + "/" + path;
 
 def hasDatabase(ip, databaseName):
-    httpAddress = createHttpAddress(ip, COUCHDB_HTTP_PORT, "_all_dbs");
-    command = ["curl", "-X", "GET", httpAddress];
+    url = createUrl(ip, COUCHDB_HTTP_PORT, "_all_dbs");
+    command = ["curl", "-X", "GET", url];
     output = executeShellCommand(command);
     parsedOutput = json.loads(output);
-    return parsedOutput["ok"];
+    return databaseName in parsedOutput;
     
 def setReplicationLink(sourceIp, targetIp, databaseName):
     command = getReplicationCommand(sourceIp, targetIp, databaseName);
     output = executeShellCommand(command);
     parsedOutput = json.loads(output);
-    if not parsedOutput["ok"]:
+    if not "ok" in parsedOutput:
         raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + ")");
     
 def isReplicationLinkSet(sourceIp, targetIp, databaseName):
     # TODO: Query _replicate database
-    return;
+    return False;
 
 def createDatabase(ip, databaseName):
-    httpAddress = createHttpAddress(ip, COUCHDB_HTTP_PORT, databaseName);
-    command = ["curl", "-X", "PUT", httpAddress];
+    url = createUrl(ip, COUCHDB_HTTP_PORT, databaseName);
+    command = ["curl", "-X", "PUT", url];
     output = executeShellCommand(command);
     parsedOutput = json.loads(output);
     if not parsedOutput["ok"]:
@@ -66,13 +66,15 @@ def executeShellCommand(command):
     process = subprocess.Popen(command, stdout = subprocess.PIPE);
     output = process.communicate()[0];
     if process.poll() != 0:
-        raise Exception("Execution of command failed (" + " ".join(command) + ")");
+        commandAsString = " ".join(command);
+        raise Exception("Execution of command failed (" + commandAsString + ")");
     return output;
 
 def getIpsOtherNodesInCluster():
     ipsInCluster = getIpsInCluster();
     ownIp = getOwnIp();
-    return ipsInCluster - ownIp;
+    ipsInCluster.remove(ownIp);
+    return ipsInCluster;
     
 def getOwnIp():
     resultset = getSectionInFile(NODES_FILE, "self");
@@ -96,5 +98,13 @@ def getSectionInFile(pathToFile, label):
             result.add(resultItem);
     filestream.close();
     return result;
-    
+
+def isCouchdbServerReachable(ip):
+    url = createUrl(ip, COUCHDB_HTTP_PORT, "_all_dbs");
+    try:
+        executeShellCommand(["curl", "-X", "GET", url]);
+    except Exception:
+        return False;
+    return True;
+
 initializeReplication();

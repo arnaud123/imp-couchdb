@@ -62,7 +62,7 @@ implementation couchdbServer:
     unit_file = std::File(host = self.host, path = "/lib/systemd/system/setup_couchdb_replication.service", owner = "root", 
 	group = "root", mode = 644, content = file("couchdb/setup_replication.service"))
     # Make setup_replication script a service
-    setup_replication_script = std::Service(host = self.host, name = "setup_couchdb_replication", state = "running", onboot = true, 
+    setup_replication_service = std::Service(host = self.host, name = "setup_couchdb_replication", state = "running", onboot = true, 
 	requires = [unit_file, setup_replication_script, databases_file, node_file, couchdb_service])
 end
 
