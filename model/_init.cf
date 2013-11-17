@@ -29,7 +29,16 @@ entity Couchdb extends ip::services::Server:
     """
 end
 
+# TODO: Checken welke restricties er op de naam liggen => regexp maken
+entity Database:
+    """
+        A couchdb database has a certain  name
+    """
+    String name
+end
+
 Cluster cluster [0:1] -- [1:] Couchdb servers
+Cluster cluster [0:1] -- [1:] Database databases
 
 implementation couchdbServer:
     # Install package
@@ -40,8 +49,23 @@ implementation couchdbServer:
     # Start couchdb service
     couchdb_service = std::Service(host = self.host, name = "couchdb", state = "running", 
 	onboot = "true", requires = [pkg, local_ini])
-    # TODO: ceate service for setting up replication
+    # Write node file
+    node_file = std::ConfigFile(path = "/etc/sysconfig/couchdb_nodes", content = template("couchdb/nodes.tmpl"), 
+	host = self.host, reload = true)
+    # Write databases file
+    databases_file = std::ConfigFile(path = "/etc/sysconfig/couchdb_databases", content = template("couchdb/databases.tmpl"), 
+	host = self.host, reload = true)
+    # Write setup_replication script file
+    setup_replication_script = std::File(host = self.host, path = "/usr/bin/setup_couchdb_replication", owner = "root", group = "root", 
+	mode = 755, content = file("couchdb/setup_replication"))
+    # Write unit file for setup_replication script
+    unit_file = std::File(host = self.host, path = "/lib/systemd/system/setup_couchdb_replication.service", owner = "root", 
+	group = "root", mode = 644, content = file("couchdb/setup_replication.service"))
+    # Make setup_replication script a service
+    service_file = std::Service(host = self.host, name = "update_riak_nodes", state = "running", onboot = true, 
+	requires = [unit_file, setup_replication_script, databases_file, node_file, couchdb_service])
 end
 
 implement Couchdb using couchdbServer
 implement Cluster using std::none
+implement Database using std::none

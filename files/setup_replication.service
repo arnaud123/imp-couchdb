@@ -1,0 +1,13 @@
+[Unit]
+Description=Service for setting up replication between the nodes in the couchdb cluster
+After=couchdb.service
+
+[Service]
+Type=simple
+User=couchdb
+Group=couchdb
+
+ExecStart=/usr/bin/setup_couchdb_replication
+
+[Install]
+WantedBy=multi-user.target

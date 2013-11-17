@@ -1,0 +1,4 @@
+{% for server in cluster.servers %}
+node {{ server.host.ip }} 
+{% endfor %}
+self {{host.ip}}
