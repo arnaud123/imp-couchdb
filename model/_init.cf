@@ -34,7 +34,7 @@ entity Database:
     """
         A couchdb database has a certain  name
     """
-    String name
+    string name
 end
 
 Cluster cluster [0:1] -- [1:] Couchdb servers
