@@ -25,10 +25,10 @@ def getReplicationCommand(sourceIp, targetIp, databaseName):
     communicateToUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, "_replicate");
     sourceUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, databaseName);
     targetUrl = createUrl(targetIp, COUCHDB_HTTP_PORT, databaseName);
-    result = ["curl", "-H", "'Content-Type: application/json'"];
+    result = ["curl", "-H", "Content-Type:application/json"];
     result += ["-X", "POST", communicateToUrl]; 
-    minusDArgument = "'{\"source\": \"" + sourceUrl + "\", \"target\": \"" + targetUrl + "\",";
-    minusDArgument += "\"create_target\": true, \"continuous\": true}'";
+    minusDArgument = "{\"source\": \"" + sourceUrl + "\", \"target\": \"" + targetUrl + "\",";
+    minusDArgument += "\"create_target\": true, \"continuous\": true}";
     result += ["-d", minusDArgument];
     return result;
 
