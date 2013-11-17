@@ -75,7 +75,12 @@ def getIpsOtherNodesInCluster():
     return ipsInCluster - ownIp;
     
 def getOwnIp():
-    return getSectionInFile(NODES_FILE, "self");
+    resultset = getSectionInFile(NODES_FILE, "self");
+    if len(resultset) == 0:
+        raise Exception("Own ip not foudn in config file: " + NODES_FILE);
+    if len(resultset) > 1:
+        raise Exception("More than one value for own ip found in config file: " + NODES_FILE);
+    return resultset.pop();
     
 def getIpsInCluster():
     return getSectionInFile(NODES_FILE, "node");
