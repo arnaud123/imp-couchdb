@@ -53,7 +53,17 @@ def setReplicationLink(sourceIp, targetIp, databaseName):
         raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + ")");
     
 def isReplicationLinkSet(sourceIp, targetIp, databaseName):
-    # TODO: Query _replicate database
+    url = createUrl(sourceIp, COUCHDB_HTTP_PORT, "_active_tasks");
+    sourceUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, databaseName + "/");
+    targetUrl = createUrl(targetIp, COUCHDB_HTTP_PORT, databaseName + "/");
+    command = ["curl", "-X", "GET", url];
+    output = executeShellCommand(command);
+    listOfTasks = json.loads(output);
+    for itemOfList in listOfTasks:
+        if itemOfList["type"] == "replication" and \
+            itemOfList["source"] == sourceUrl and \
+            itemOfList["target"] == targetUrl:
+            return True;
     return False;
 
 def createDatabase(ip, databaseName):
