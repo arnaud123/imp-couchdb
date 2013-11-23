@@ -19,7 +19,7 @@ def replicateDatabasesTo(databaseNames, ipsToReplicateTo):
         for database in databaseNames:
             if not hasDatabase(getOwnIp(), database):
                 createDatabase(getOwnIp(), database);
-            if not isReplicationLinkSet(getOwnIp(), targetIp, database) and isCouchdbServerReachable(targetIp):
+            if isCouchdbServerReachable(targetIp):
                 setReplicationLink(getOwnIp(), targetIp, database);
                 setReplicationLink(targetIp, getOwnIp(), database);
 
@@ -36,7 +36,7 @@ def getReplicationCommand(sourceIp, targetIp, databaseName):
 
 # Path parameter without leading slash
 def createUrl(ip, port, path):
-    return "http://" +  ip + ":" + str(port) + "/" + path;
+    return "http://" +  ip + ":" + str(port) + "/" + path + "/";
 
 def hasDatabase(ip, databaseName):
     url = createUrl(ip, COUCHDB_HTTP_PORT, "_all_dbs");
@@ -51,20 +51,6 @@ def setReplicationLink(sourceIp, targetIp, databaseName):
     parsedOutput = json.loads(output);
     if not "ok" in parsedOutput:
         raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + ")");
-    
-def isReplicationLinkSet(sourceIp, targetIp, databaseName):
-    url = createUrl(sourceIp, COUCHDB_HTTP_PORT, "_active_tasks");
-    sourceUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, databaseName + "/");
-    targetUrl = createUrl(targetIp, COUCHDB_HTTP_PORT, databaseName + "/");
-    command = ["curl", "-X", "GET", url];
-    output = executeShellCommand(command);
-    listOfTasks = json.loads(output);
-    for itemOfList in listOfTasks:
-        if itemOfList["type"] == "replication" and \
-            itemOfList["source"] == sourceUrl and \
-            itemOfList["target"] == targetUrl:
-            return True;
-    return False;
 
 def createDatabase(ip, databaseName):
     url = createUrl(ip, COUCHDB_HTTP_PORT, databaseName);
