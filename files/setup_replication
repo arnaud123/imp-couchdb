@@ -49,16 +49,16 @@ def setReplicationLink(sourceIp, targetIp, databaseName):
     command = getReplicationCommand(sourceIp, targetIp, databaseName);
     output = executeShellCommand(command);
     parsedOutput = json.loads(output);
-    if not "ok" in parsedOutput:
-        raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + ")");
+    if (not "ok" in parsedOutput) or (not parsedOutput["ok"]):
+        raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + "), Output:" + parsedOutput);
 
 def createDatabase(ip, databaseName):
     url = createUrl(ip, COUCHDB_HTTP_PORT, databaseName);
     command = ["curl", "-X", "PUT", url];
     output = executeShellCommand(command);
     parsedOutput = json.loads(output);
-    if not parsedOutput["ok"]:
-        raise Exception("Database could not be created");
+    if (not "ok" in parsedOutput) or (not parsedOutput["ok"]):
+        raise Exception("Database could not be created, Output:" + parsedOutput);
 
 def executeShellCommand(command):
     process = subprocess.Popen(command, stdout = subprocess.PIPE);
