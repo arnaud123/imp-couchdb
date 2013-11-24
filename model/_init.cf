@@ -31,13 +31,13 @@ end
 
 # TODO: Checken welke restricties er op de naam liggen => regexp maken
 # Enkel toegestaan is: lowercase letters (a-z), digits (0-9), or any of the _$()+-/ characters
-typedef database_name as string matching /[0-9a-z_$()+-/]+/
+#typedef database_name as string matching /[0-9a-z_$()+-/]+/
 
 entity Database:
     """
         A couchdb database has a certain  name
     """
-    database_name name
+    string name
 end
 
 Cluster cluster [0:1] -- [1:] Couchdb servers
