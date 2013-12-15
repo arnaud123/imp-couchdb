@@ -17,21 +17,31 @@ def initializeReplication():
 def replicateDatabasesTo(databaseNames, ipsToReplicateTo):
     for targetIp in ipsToReplicateTo:
         for database in databaseNames:
-            if not hasDatabase(getOwnIp(), database):
-                createDatabase(getOwnIp(), database);
-            if isCouchdbServerReachable(targetIp):
-                setReplicationLink(getOwnIp(), targetIp, database);
-                setReplicationLink(targetIp, getOwnIp(), database);
+            replicateBetween(targetIp, database);
+
+def replicateBetween(targetIp, database):
+    if not hasDatabase(getOwnIp(), database):
+        createDatabase(getOwnIp(), database);
+    if isCouchdbServerReachable(targetIp):
+        if not isReplicationLinkSet(getOwnIp(), targetIp, database):
+            setReplicationLink(getOwnIp(), targetIp, database);
+        if not isReplicationLinkSet(targetIp, getOwnIp(), database):
+            setReplicationLink(targetIp, getOwnIp(), database);
 
 def getReplicationCommand(sourceIp, targetIp, databaseName):
-    communicateToUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, "_replicate");
+    communicateToUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, "_replicator");
     sourceUrl = createUrl(sourceIp, COUCHDB_HTTP_PORT, databaseName);
     targetUrl = createUrl(targetIp, COUCHDB_HTTP_PORT, databaseName);
+    document = {};
+    document["_id"] = getReplicationId(sourceIp, targetIp, databaseName);
+    document["source"] = sourceUrl;
+    document["target"] = targetUrl;
+    document["create_target"] = True;
+    document["continuous"] = True;
+    documentAsString = json.dumps(document);
     result = ["curl", "-H", "Content-Type:application/json"];
     result += ["-X", "POST", communicateToUrl]; 
-    minusDArgument = "{\"source\": \"" + sourceUrl + "\", \"target\": \"" + targetUrl + "\",";
-    minusDArgument += "\"create_target\": true, \"continuous\": true}";
-    result += ["-d", minusDArgument];
+    result += ["-d", documentAsString];
     return result;
 
 # Path parameter without leading slash
@@ -50,7 +60,20 @@ def setReplicationLink(sourceIp, targetIp, databaseName):
     output = executeShellCommand(command);
     parsedOutput = json.loads(output);
     if (not "ok" in parsedOutput) or (not parsedOutput["ok"]):
-        raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + "), Output:" + parsedOutput);
+        raise Exception("Replication link could not be set: (" + sourceIp + "=>" + targetIp + ":" + databaseName + "), Output:" + output);
+
+def isReplicationLinkSet(sourceIp, targetIp, databaseName):
+    path = "_replicator/" + getReplicationId(sourceIp, targetIp, databaseName);
+    url = createUrl(sourceIp, COUCHDB_HTTP_PORT, path);
+    command = ["curl", "-X", "GET", url];
+    output = executeShellCommand(command);
+    parsedOutput = json.loads(output);
+    if ("error" in parsedOutput) and (parsedOutput["error"] == "not_found"):
+        return False;
+    return True; 
+
+def getReplicationId(sourceIp, targetIp, databaseName):
+	return sourceIp + "_" + targetIp + "_" + databaseName;
 
 def createDatabase(ip, databaseName):
     url = createUrl(ip, COUCHDB_HTTP_PORT, databaseName);
@@ -77,9 +100,9 @@ def getIpsOtherNodesInCluster():
 def getOwnIp():
     resultset = getSectionInFile(NODES_FILE, "self");
     if len(resultset) == 0:
-        raise Exception("Own ip not foudn in config file: " + NODES_FILE);
+        raise Exception("Own ip not found in config file: " + NODES_FILE);
     if len(resultset) > 1:
-        raise Exception("More than one value for own ip found in config file: " + NODES_FILE);
+        raise Exception("More than one value for self found in config file: " + NODES_FILE);
     return resultset.pop();
     
 def getIpsInCluster():
@@ -114,3 +137,4 @@ def waitUntilSelfIsReachable():
     raise Exception("Unable to reach couchdb server on own node");
 
 initializeReplication();
+
