@@ -14,7 +14,7 @@
     limitations under the License.
 
     Administrative Contact: dnet-project-office@cs.kuleuven.be
-    Technical Contact: arnaud.schoonjans@student.kuleuven.be
+    Technical Contact: arnaud.schoonjans@cs.kuleuven.be
 """
 
 entity Cluster:
@@ -47,23 +47,23 @@ implementation couchdbServer:
     # Install package
     pkg = std::Package(name = "couchdb", state = "installed", host = self.host)
     # Set local.ini config file
-    local_ini = std::ConfigFile(path = "/etc/couchdb/local.ini",
-                content = template("couchdb/local.ini.tmpl"), host = self.host, requires = pkg, reload = true)
+    local_ini = std::ConfigFile(path = "/etc/couchdb/local.ini", content = template("couchdb/local.ini.tmpl"), 
+			        host = self.host, mode=644, owner="couchdb", group="couchdb", requires = pkg, reload = true)
     # Start couchdb service
     couchdb_service = std::Service(host = self.host, name = "couchdb", state = "running", 
 	onboot = "true", requires = [pkg, local_ini])
     # Write node file
     node_file = std::ConfigFile(path = "/etc/sysconfig/couchdb_nodes", content = template("couchdb/nodes.tmpl"), 
-	host = self.host, reload = true)
+	                        mode=644, owner="couchdb", group="couchdb", host = self.host, reload = true)
     # Write databases file
     databases_file = std::ConfigFile(path = "/etc/sysconfig/couchdb_databases", content = template("couchdb/databases.tmpl"), 
-	host = self.host, reload = true)
+                                     mode=644, owner="couchdb", group="couchdb", host = self.host, reload = true)
     # Write setup_replication script file
-    setup_replication_script = std::File(host = self.host, path = "/usr/bin/setup_couchdb_replication", owner = "root", group = "root", 
-	mode = 755, content = file("couchdb/setup_replication"))
+    setup_replication_script = std::File(host = self.host, path = "/usr/bin/setup_couchdb_replication", owner = "couchdb", group = "couchdb", 
+	mode=755, content = file("couchdb/setup_replication"))
     # Write unit file for setup_replication script
     unit_file = std::File(host = self.host, path = "/lib/systemd/system/setup_couchdb_replication.service", owner = "root", 
-	group = "root", mode = 644, content = file("couchdb/setup_replication.service"))
+	group = "root", mode=644, content = file("couchdb/setup_replication.service"))
     # Make setup_replication script a service
     setup_replication_service = std::Service(host = self.host, name = "setup_couchdb_replication", state = "running", onboot = true, 
 	requires = [unit_file, setup_replication_script, databases_file, node_file, couchdb_service])
