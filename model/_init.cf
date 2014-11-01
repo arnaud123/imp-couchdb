@@ -45,6 +45,7 @@ Cluster cluster [0:1] -- [1:] Database databases
 
 implementation couchdbServer:
     # Install package
+    curl = std::Package(name = "curl", state = "installed", host = self.host)
     pkg = std::Package(name = "couchdb", state = "installed", host = self.host)
     # Set local.ini config file
     local_ini = std::ConfigFile(path = "/etc/couchdb/local.ini", content = template("couchdb/local.ini.tmpl"), 
@@ -66,7 +67,7 @@ implementation couchdbServer:
 	group = "root", mode=644, content = file("couchdb/setup_replication.service"))
     # Make setup_replication script a service
     setup_replication_service = std::Service(host = self.host, name = "setup_couchdb_replication", state = "running", onboot = true, 
-	requires = [unit_file, setup_replication_script, databases_file, node_file, couchdb_service])
+	requires = [curl, unit_file, setup_replication_script, databases_file, node_file, couchdb_service])
 end
 
 implement Couchdb using couchdbServer
